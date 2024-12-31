@@ -1,40 +1,40 @@
 ﻿using eShop.AppHost;
 using Microsoft.Extensions.Configuration;
 
-var builder = DistributedApplication.CreateBuilder(args);
+IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddForwardedHeaders();
 
-var redis = builder.AddRedis("redis");
-var rabbitMq = builder.AddRabbitMQ("eventbus");
-var postgres = builder.AddPostgres("postgres")
+IResourceBuilder<RedisResource> redis = builder.AddRedis("redis");
+IResourceBuilder<RabbitMQServerResource> rabbitMq = builder.AddRabbitMQ("eventbus");
+IResourceBuilder<PostgresServerResource> postgres = builder.AddPostgres("postgres")
     .WithImage("ankane/pgvector")
     .WithImageTag("latest");
 
-var catalogDb = postgres.AddDatabase("catalogdb");
-var identityDb = postgres.AddDatabase("identitydb");
-var orderDb = postgres.AddDatabase("orderingdb");
-var webhooksDb = postgres.AddDatabase("webhooksdb");
+IResourceBuilder<PostgresDatabaseResource> catalogDb = postgres.AddDatabase("catalogdb");
+IResourceBuilder<PostgresDatabaseResource> identityDb = postgres.AddDatabase("identitydb");
+IResourceBuilder<PostgresDatabaseResource> orderDb = postgres.AddDatabase("orderingdb");
+IResourceBuilder<PostgresDatabaseResource> webhooksDb = postgres.AddDatabase("webhooksdb");
 
-var launchProfileName = ShouldUseHttpForEndpoints() ? "http" : "https";
+string launchProfileName = ShouldUseHttpForEndpoints() ? "http" : "https";
 
 // Services
-var identityApi = builder.AddProject<Projects.Identity_API>("identity-api", launchProfileName)
+IResourceBuilder<ProjectResource> identityApi = builder.AddProject<Projects.Identity_API>("identity-api", launchProfileName)
     .WithExternalHttpEndpoints()
     .WithReference(identityDb);
 
-var identityEndpoint = identityApi.GetEndpoint(launchProfileName);
+EndpointReference identityEndpoint = identityApi.GetEndpoint(launchProfileName);
 
-var basketApi = builder.AddProject<Projects.Basket_API>("basket-api")
+IResourceBuilder<ProjectResource> basketApi = builder.AddProject<Projects.Basket_API>("basket-api")
     .WithReference(redis)
     .WithReference(rabbitMq)
     .WithEnvironment("Identity__Url", identityEndpoint);
 
-var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
+IResourceBuilder<ProjectResource> catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(rabbitMq)
     .WithReference(catalogDb);
 
-var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
+IResourceBuilder<ProjectResource> orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
     .WithReference(rabbitMq)
     .WithReference(orderDb)
     .WithEnvironment("Identity__Url", identityEndpoint);
